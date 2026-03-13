@@ -68,3 +68,20 @@ pub fn fromJSON(arg: NixValue) -> NixValue {
     let json = serde_json::from_str(&s).unwrap();
     NixValue::from(Wrap(json))
 }
+
+// Convert a NixValue value into a JSON5 string.
+#[export_nix]
+pub fn toJSON5(arg: NixValue) -> NixValue {
+    let nix = NixValue::from(arg);
+    NixValue::String(json5::to_string(&Json::from(Wrap(nix))).unwrap())
+}
+
+// Convert a JSON5 string into a NixValue.
+#[export_nix]
+pub fn fromJSON5(arg: NixValue) -> NixValue {
+    let NixValue::String(s) = arg else {
+        panic!("fromJSON can only be called on a string.")
+    };
+    let json = json5::from_str(&s).unwrap();
+    NixValue::from(Wrap(json))
+}

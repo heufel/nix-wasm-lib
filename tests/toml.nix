@@ -15,9 +15,9 @@ let
   testToml = ''
     a = 1
     b = "b"
-    c = ["d", 2]
-    [f]
-    g = 3
+    c = ["d", 2.5]
+    [e]
+    f = 3
   '';
 in
 let
