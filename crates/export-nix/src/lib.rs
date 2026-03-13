@@ -1,28 +1,43 @@
 use std::str::FromStr;
 
-use proc_macro::{Delimiter, Group, Ident, TokenStream, TokenTree};
+use proc_macro::{Delimiter, Group, Ident, Span, TokenStream, TokenTree};
 
 macro_rules! force {
-    ($f:expr, $emsg:literal $(,)?) => {
+    ($f:expr, $emsg:literal, $tt:expr) => {
+
         match $f {
             Ok(ok) => ok,
+            Err(ParseError::NonMatch(s)) => {
+                let err =
+                    TokenStream::from_str(&format!(r#"compile_error!("{}");"#, $emsg))
+                        .unwrap()
+                        .into_iter()
+                        .map(|mut t| {t.set_span(s); t})
+                        .collect();
+                return err;
+            }
             Err(_) => {
                 return TokenStream::from_str(&format!(r#"compile_error!("{}");"#, $emsg)).unwrap()
             }
-        }
+        }    };
+    ($f:ident($tt:expr), $emsg:literal) => {
+        force!($f($tt), $emsg, $tt)
+    };
+    ($f:ident($tt:expr, $($a:expr),*), $emsg:literal) => {
+        force!($f($tt, $($a),*), $emsg, $tt)
     };
 }
 
 #[derive(Debug)]
 enum ParseError {
-    NonMatch,
+    NonMatch(Span),
     NoneLeft,
 }
 
 type It = std::iter::Peekable<proc_macro::token_stream::IntoIter>;
 
 #[proc_macro_attribute]
-pub fn export_nix(_args: TokenStream, input: TokenStream) -> TokenStream {
+pub fn export_nix(_: TokenStream, input: TokenStream) -> TokenStream {
     let tt = &mut input.into_iter().peekable();
     force!(
         parse_lit(tt, "pub"),
@@ -30,7 +45,7 @@ pub fn export_nix(_args: TokenStream, input: TokenStream) -> TokenStream {
     );
     force!(parse_lit(tt, "fn"), "Expected fn");
     let function_name = force!(parse_ident(tt), "Expected function name.").to_string();
-    let args_ts = tt.peek().ok_or(ParseError::NonMatch).unwrap().to_string();
+    let args_ts = tt.peek().ok_or(ParseError::NoneLeft).unwrap().to_string();
     let args = force!(parse_args(tt), "Expected arguments.");
     force!(
         parse_punct(tt, "-"),
@@ -62,8 +77,8 @@ pub fn export_nix(_args: TokenStream, input: TokenStream) -> TokenStream {
             pub extern "C" fn {function_name}({argstr}) -> {value} {{
                 use {value} as _;
                 use {nix_value} as _;
-                fn _internal {args_ts} -> {ret} {body}
-                {value}::from({nix_value}::from(_internal ({args_pass})))
+                fn __{function_name} {args_ts} -> {ret} {body}
+                {value}::from({nix_value}::from(__{function_name} ({args_pass})))
             }}
         "#
     ))
@@ -71,10 +86,10 @@ pub fn export_nix(_args: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 fn parse_ident(tt: &mut It) -> Result<Ident, ParseError> {
-    let TokenTree::Ident(id) = tt.next().ok_or(ParseError::NoneLeft)? else {
-        return Err(ParseError::NonMatch);
-    };
-    Ok(id)
+    match tt.next().ok_or(ParseError::NoneLeft)? {
+        TokenTree::Ident(id) => Ok(id),
+        tt => Err(ParseError::NonMatch(tt.span())),
+    }
 }
 
 fn parse_lit(tt: &mut It, lit: &str) -> Result<(), ParseError> {
@@ -82,15 +97,15 @@ fn parse_lit(tt: &mut It, lit: &str) -> Result<(), ParseError> {
     if id.to_string() == lit {
         Ok(())
     } else {
-        Err(ParseError::NonMatch)
+        Err(ParseError::NonMatch(id.span()))
     }
 }
 
 fn parse_group(tt: &mut It) -> Result<Group, ParseError> {
-    let TokenTree::Group(grp) = tt.next().ok_or(ParseError::NoneLeft)? else {
-        return Err(ParseError::NonMatch);
-    };
-    Ok(grp)
+    match tt.next().ok_or(ParseError::NoneLeft)? {
+        TokenTree::Group(grp) => Ok(grp),
+        t => Err(ParseError::NonMatch(t.span())),
+    }
 }
 
 fn parse_function(tt: &mut It) -> Result<Group, ParseError> {
@@ -98,18 +113,19 @@ fn parse_function(tt: &mut It) -> Result<Group, ParseError> {
     if grp.delimiter() == Delimiter::Brace {
         Ok(grp)
     } else {
-        Err(ParseError::NonMatch)
+        Err(ParseError::NonMatch(grp.span()))
     }
 }
 
 fn parse_punct(tt: &mut It, punct: &str) -> Result<(), ParseError> {
-    let TokenTree::Punct(p) = tt.next().ok_or(ParseError::NoneLeft)? else {
-        return Err(ParseError::NonMatch);
+    let p = match tt.next().ok_or(ParseError::NoneLeft)? {
+        TokenTree::Punct(p) => p,
+        t => return Err(ParseError::NonMatch(t.span())),
     };
     if p.to_string() == punct {
         Ok(())
     } else {
-        Err(ParseError::NonMatch)
+        Err(ParseError::NonMatch(p.span()))
     }
 }
 
@@ -139,7 +155,7 @@ fn check_group(tt: &mut It) -> Result<bool, ParseError> {
 fn parse_until_group(tt: &mut It) -> Result<TokenStream, ParseError> {
     let mut ty = TokenStream::new();
     while let Ok(false) = check_group(tt) {
-        ty.extend(Some(tt.next().ok_or(ParseError::NonMatch)?));
+        ty.extend(Some(tt.next().ok_or(ParseError::NoneLeft)?));
     }
     Ok(ty)
 }
@@ -152,7 +168,7 @@ fn parse_arg(tt: &mut It) -> Result<Arg, ParseError> {
 
     let mut ty = TokenStream::new();
     while let Ok(false) = check_punct(tt, ",") {
-        ty.extend(Some(tt.next().ok_or(ParseError::NonMatch)?));
+        ty.extend(Some(tt.next().ok_or(ParseError::NoneLeft)?));
     }
     Ok((name, ty))
 }
@@ -164,10 +180,11 @@ fn parse_args(tt: &mut It) -> Result<Vec<Arg>, ParseError> {
         args.push(next);
         if let Ok(true) = check_punct(raw_args, ",") {
             parse_punct(raw_args, ",")?;
-        } else if raw_args.next().is_none() {
-            break;
         } else {
-            return Err(ParseError::NonMatch);
+            match raw_args.next() {
+                Some(t) => return Err(ParseError::NonMatch(t.span())),
+                None => break,
+            };
         };
     }
 
