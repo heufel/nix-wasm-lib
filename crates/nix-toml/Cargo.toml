@@ -10,3 +10,4 @@ crate-type = ["cdylib"]
 nix-types.path = "../nix-types"
 export-nix.path = "../export-nix"
 toml = "1.0.6"
+serde = "1.0.228"

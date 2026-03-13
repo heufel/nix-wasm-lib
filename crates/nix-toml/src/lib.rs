@@ -50,19 +50,46 @@ impl From<Wrap<NixValue>> for Toml {
     }
 }
 
-// Convert a NixValue value into a TOML string.
+// Convert a NixValue::Attrs into a TOML string.
 #[export_nix]
 pub fn toTOML(arg: NixValue) -> NixValue {
     let nix = NixValue::from(arg);
+    let NixValue::Attrs(_) = nix else {
+        panic!("Only Attrsets can be serialized with toTOML. To serialize a single value, use toTOMLValue")
+    };
     NixValue::String(toml::to_string_pretty(&Toml::from(Wrap(nix))).unwrap())
 }
 
-// Convert a TOML string into a NixValue.
+// Convert a NixValue into a TOML string.
+#[export_nix]
+pub fn toTOMLValue(arg: NixValue) -> NixValue {
+    let nix = NixValue::from(arg);
+    let mut out = String::new();
+    serde::Serialize::serialize(
+        &Toml::from(Wrap(nix)),
+        toml::ser::ValueSerializer::new(&mut out),
+    )
+    .unwrap();
+    NixValue::String(out)
+}
+
+// Convert a TOML string into a NixValue::Attrset.
 #[export_nix]
 pub fn fromTOML(arg: NixValue) -> NixValue {
     let NixValue::String(s) = arg else {
         panic!("fromTOML can only be called on a string.")
     };
     let toml = toml::from_str(&s).unwrap();
+    NixValue::from(Wrap(toml))
+}
+
+// Convert a TOML value into a NixValue.
+#[export_nix]
+pub fn fromTOMLValue(arg: NixValue) -> NixValue {
+    use serde::Deserialize;
+    let NixValue::String(s) = arg else {
+        panic!("fromTOMLValue can only be called on a string.")
+    };
+    let toml = Toml::deserialize(toml::de::ValueDeserializer::parse(&s).unwrap()).unwrap();
     NixValue::from(Wrap(toml))
 }

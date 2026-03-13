@@ -66,6 +66,7 @@ version = "0.1.0"
 dependencies = [
  "export-nix",
  "nix-types",
+ "serde",
  "toml",
 ]
 
