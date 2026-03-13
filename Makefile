@@ -4,13 +4,13 @@ build:
 WASM_INS=ins
 WASM_FUNCTION="{                           \
   $(WASM_INS) = {                          \
-    wasmt =                                \
+    toml =                                 \
       function:                            \
       builtins.wasm {                      \
         inherit function;                  \
         path = ./result/lib/nix_toml.wasm; \
       };                                   \
-    wasmj =                                \
+    json =                                 \
       function:                            \
       builtins.wasm {                      \
         inherit function;                  \
