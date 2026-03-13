@@ -1,0 +1,10 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+
+[workspace.dependencies]
+nix-wasm-rust = { git = "ssh://git@github.com/DeterminateSystems/nix-wasm-rust.git" }
+
+[workspace.metadata]
+crane.name = "nix-wasm-lib"

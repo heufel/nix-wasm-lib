@@ -1,0 +1,12 @@
+[package]
+name = "nix-toml"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+nix-types.path = "../nix-types"
+export-nix.path = "../export-nix"
+toml = "1.0.6"

@@ -1,0 +1,31 @@
+{
+  out,
+  testNix,
+  drv,
+  ...
+}:
+let
+  wasm =
+    function:
+    builtins.wasm {
+      inherit function;
+      path = "${out}/lib/nix_json.wasm";
+    };
+
+  testJson = ''
+    {
+      "a": 1,
+      "b": "b",
+      "c": ["d", 2],
+      "f": {"g": 3}
+    }
+  '';
+in
+let
+  fromJson = wasm "fromJSON" testJson;
+  toJson = wasm "toJSON" fromJson;
+  fromJson' = wasm "fromJSON" toJson;
+in
+assert (fromJson == testNix);
+assert (fromJson' == testNix);
+drv (wasm "toJSON" fromJson')

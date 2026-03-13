@@ -1,0 +1,9 @@
+[package]
+name = "tests"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+export-nix.path = "../export-nix"
+nix-types.path = "../nix-types"
+nix-wasm-rust = { workspace = true }

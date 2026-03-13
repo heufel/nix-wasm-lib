@@ -1,0 +1,12 @@
+[package]
+name = "nix-json"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+export-nix.path = "../export-nix"
+nix-types.path = "../nix-types"
+serde_json = "1.0.149"
