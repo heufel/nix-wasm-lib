@@ -1,16 +1,11 @@
 {
-  out,
   testNix,
   drv,
+  wasm-fns,
   ...
 }:
 let
-  wasm =
-    function:
-    builtins.wasm {
-      inherit function;
-      path = "${out}/lib/nix_json.wasm";
-    };
+  wasm = wasm-fns { evaluator = builtins.wasm; };
 
   testJson5 = ''
     {
@@ -22,10 +17,10 @@ let
   '';
 in
 let
-  fromJson5 = wasm "fromJSON5" testJson5;
-  toJson5 = wasm "toJSON5" fromJson5;
-  fromJson5' = wasm "fromJSON5" toJson5;
+  fromJson5 = wasm.fromJSON5 testJson5;
+  toJson5 = wasm.toJSON5 fromJson5;
+  fromJson5' = wasm.fromJSON5 toJson5;
 in
 assert (fromJson5 == testNix);
 assert (fromJson5' == testNix);
-drv (wasm "toJSON5" fromJson5')
+drv (wasm.toJSON5 fromJson5')

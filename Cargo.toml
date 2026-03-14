@@ -5,9 +5,11 @@ members = ["crates/*"]
 [workspace.package]
 authors = ["heufel"]
 version = "0.1.0"
+description = "Some library functions and examples for interfacing nix and wasm"
 edition = "2024"
 repository = "https://github.com/heufel/nix-wasm-lib"
 license = "LGPL-2.1"
+categories = ["nix", "WebAssembly"]
 
 [workspace.dependencies]
 nix-wasm-rust = { git = "ssh://git@github.com/DeterminateSystems/nix-wasm-rust.git" }

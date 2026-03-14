@@ -1,16 +1,12 @@
 {
-  out,
   testNix,
   drv,
+  wasm-fns,
   ...
 }:
 let
-  wasm =
-    function:
-    builtins.wasm {
-      inherit function;
-      path = "${out}/lib/nix_toml.wasm";
-    };
+
+  wasm = wasm-fns { evaluator = builtins.wasm; };
 
   testToml = ''
     a = 1
@@ -21,10 +17,10 @@ let
   '';
 in
 let
-  fromToml = wasm "fromTOML" testToml;
-  toToml = wasm "toTOML" fromToml;
-  fromToml' = wasm "fromTOML" toToml;
+  fromToml = wasm.fromTOML testToml;
+  toToml = wasm.toTOML fromToml;
+  fromToml' = wasm.fromTOML toToml;
 in
 assert (fromToml == testNix);
 assert (fromToml' == testNix);
-drv (wasm "toTOML" fromToml')
+drv (wasm.toTOML fromToml')

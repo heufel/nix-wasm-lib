@@ -1,7 +1,11 @@
 [package]
 name = "tests"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+categories.workspace = true
 
 [dependencies]
 export-nix.path = "../export-nix"

@@ -49,13 +49,10 @@
       } $@";
     in
     rec {
-      packages.${system} = rec {
+      inherit (wasm-nix) functions;
+      packages.${system} = {
         inherit dnix;
-        wasm = pkgs.buildEnv {
-          name = "nix-wasm";
-          paths = builtins.attrValues wasm-nix.wasm;
-        };
-        default = wasm;
+        default = wasm-nix.wasm.wasm;
       }
       // wasm-nix.wasm;
 
@@ -78,7 +75,6 @@
             name:
             (import ./tests/${name}) {
               inherit testNix;
-              out = packages.${system}.wasm;
               drv =
                 result:
                 derivation {
@@ -89,6 +85,7 @@
                     ''echo -e "${name}:\n${result}" && echo "" > $out''
                   ];
                 };
+              wasm-fns = functions;
             };
           tests = attrNames (
             mapAttrs (name: type: type == "regular" && hasSuffix ".nix" name) (readDir ./tests)

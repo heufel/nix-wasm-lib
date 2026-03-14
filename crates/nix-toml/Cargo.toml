@@ -1,7 +1,11 @@
 [package]
 name = "nix-toml"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+categories.workspace = true
 
 [lib]
 crate-type = ["cdylib"]
@@ -11,3 +15,6 @@ nix-types.path = "../nix-types"
 export-nix.path = "../export-nix"
 toml = "1.0.6"
 serde = "1.0.228"
+
+[package.metadata]
+nix-exports = ["toTOML", "toTOMLValue", "fromTOML", "fromTOMLValue"]

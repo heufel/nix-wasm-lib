@@ -6,12 +6,25 @@
   ...
 }:
 let
+  inherit (builtins)
+    readFile
+    readDir
+    attrNames
+    attrValues
+    listToAttrs
+    filter
+    head
+    replaceStrings
+    mapAttrs
+    elem
+    ;
+  inherit (lib) filterAttrs optional mergeAttrsList;
   wasm-ld =
     let
       version = "0.5.21";
       name = "wasm-component-ld";
       src = fetchGit {
-        url = "https://github.com/bytecodealliance/wasm-component-ld.git";
+        url = "https://github.com/bytecodealliance/${name}.git";
         ref = "refs/tags/v${version}";
         rev = "0a5f2513f6157e2c01c0485aa68365d8e4622ccb";
       };
@@ -26,7 +39,7 @@ let
     name: version:
     craneLib.buildPackage {
       inherit name version;
-      buildInputs = [ wasm-ld ] ++ (with pkgs; lib.optionals stdenv.isDarwin [ libiconv ]);
+      buildInputs = [ wasm-ld ];
       src = ./.;
       cargoToml = ./Cargo.toml;
       cargoVendorDir = craneLib.vendorCargoDeps {
@@ -37,47 +50,65 @@ let
       doCheck = false;
       cargoExtraArgs = "--target ${target}";
     };
-  read-cargo-toml = crate: fromTOML (builtins.readFile "${crate}/Cargo.toml");
 
-  wasm =
-    with builtins;
-    with lib;
+  exports =
     let
+      version = (fromTOML (readFile ./Cargo.toml)).workspace.package.version;
+
       dirs = map (dir: ./crates/${dir}) (
-        attrNames (filterAttrs (n: t: t == "directory") (readDir ./crates))
+        attrNames (filterAttrs (_: t: t == "directory") (readDir ./crates))
       );
+
       is-crate = dir: elem "Cargo.toml" (attrNames (readDir dir));
-      is-cdylib =
-        crate:
-        let
-          toml = read-cargo-toml crate;
-        in
-        (toml ? lib.crate-type) && elem "cdylib" toml.lib.crate-type;
-      cdylibs = filter is-cdylib (filter is-crate dirs);
-      get-name-version =
-        crate:
-        let
-          toml = read-cargo-toml crate;
-        in
-        {
-          name = toml.package.name;
-          version = toml.package.version;
+      read-crate = crate: fromTOML (readFile "${crate}/Cargo.toml");
+      crates = map read-crate (filter is-crate dirs);
+
+      get-exports =
+        toml: optional (toml ? package.metadata.nix-exports) toml.package.metadata.nix-exports;
+
+      output-set = map (crate: rec {
+        name = crate.package.name;
+        value = {
+          package = nix-wasm-crate name version;
+          functions = get-exports crate;
         };
+      }) crates;
+      output-filtered = filter (crate: crate.value.functions != [ ]) output-set;
     in
-    listToAttrs (
-      map (
-        lib:
-        let
-          nv = get-name-version lib;
-        in
-        {
-          name = nv.name;
-          value = nix-wasm-crate nv.name nv.version;
-        }
-      ) cdylibs
-    );
+    listToAttrs output-filtered;
 
 in
-{
-  inherit wasm-ld wasm;
+rec {
+  inherit wasm-ld;
+  wasm =
+    let
+      separated = mapAttrs (_: prev: prev.package) exports;
+    in
+    separated
+    // {
+      wasm = pkgs.buildEnv {
+        name = "nix-wasm";
+        paths = attrValues separated;
+      };
+    };
+  functions =
+    {
+      package ? wasm.wasm,
+      evaluator,
+    }:
+    let
+      separated = mapAttrs (
+        name: prev:
+        listToAttrs (
+          map (function: {
+            name = function;
+            value = evaluator {
+              function = function;
+              path = "${package}/lib/${replaceStrings [ "-" ] [ "_" ] name}.wasm";
+            };
+          }) (head prev.functions) # no clue why head has to be called here...
+        )
+      ) exports;
+    in
+    separated // mergeAttrsList (attrValues separated);
 }
