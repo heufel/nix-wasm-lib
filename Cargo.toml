@@ -2,6 +2,12 @@
 resolver = "3"
 members = ["crates/*"]
 
+[workspace.package]
+authors = ["heufel"]
+version = "0.1.0"
+edition = "2024"
+repository = "https://github.com/heufel/nix-wasm-lib"
+license = "LGPL-2.1"
 
 [workspace.dependencies]
 nix-wasm-rust = { git = "ssh://git@github.com/DeterminateSystems/nix-wasm-rust.git" }
